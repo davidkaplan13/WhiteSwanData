@@ -44,7 +44,7 @@ def date_parser(time) -> str:
         return "Event Finished"
     return (current_time + timedelta(days=days, hours=hours, minutes=minutes)).strftime("%Y-%m-%d %H:%M")
 
-def extract_race_urls(driver: SafariWebDriver) -> Any:
+def extract_race_urls(driver: SafariWebDriver, tomorrow: bool=False) -> Any:
     """ Gets race urls, times and number. """
     wait = WebDriverWait(driver, 10)
 
@@ -59,6 +59,7 @@ def extract_race_urls(driver: SafariWebDriver) -> Any:
 
     hrefs = []
     times = []
+    days = []
     race_numbers = []
     race_number = 0
     for slide in slides:
@@ -80,8 +81,14 @@ def extract_race_urls(driver: SafariWebDriver) -> Any:
             hrefs.append(href)
             times.append(event_time)  
             race_number += 1
+            if tomorrow:
+                days.append("tomorrow")
+            else:
+                days.append("today")
+            
             race_numbers.append(race_number)
-    return hrefs, times, race_numbers
+            
+    return hrefs, times, race_numbers, days
 
 def click_race_date(driver: SafariWebDriver, element_selector: str) -> SafariWebDriver:
     """ Click on race date element"""
@@ -93,17 +100,18 @@ def click_race_date(driver: SafariWebDriver, element_selector: str) -> SafariWeb
         driver.execute_script("arguments[0].click();", button)
     return driver    
 
-def extract_tracks(driver: SafariWebDriver, tommorw: bool=False) -> pd.DataFrame:
+def extract_tracks(driver: SafariWebDriver, tomorrow: bool=False) -> pd.DataFrame:
     """ Main function for extracting tracks and race information"""
     tracks = []
     tracks_links = []
     race_times = []
     race_numbers = []
+    days = []
     wait = WebDriverWait(driver, 10)
     
     time.sleep(2)
     
-    if tommorw:
+    if tomorrow:
         button_selector = '[data-fs-title="page:racing-tab:tomorrow-header_bar"]'
     else:
         button_selector = '[data-fs-title="page:racing-tab:today-header_bar"]'
@@ -142,12 +150,14 @@ def extract_tracks(driver: SafariWebDriver, tommorw: bool=False) -> pd.DataFrame
             except Exception:
                 item = re_initalize_elements(race)[item_index]
                 driver.execute_script("arguments[0].click();", re_initalize_elements(race)[item_index])
-            hrefs, times, track_race_numbers = extract_race_urls(driver)
+            hrefs, times, track_race_numbers, day = extract_race_urls(driver, tomorrow)
             for index in range(len(hrefs)):
                 tracks.append(track)
                 tracks_links.append(hrefs[index])
                 race_times.append(times[index])
                 race_numbers.append(track_race_numbers[index])
+                days.append(day[index])
+            
 
             
             time.sleep(2)
@@ -162,7 +172,7 @@ def extract_tracks(driver: SafariWebDriver, tommorw: bool=False) -> pd.DataFrame
             # Wait until the page is back to the race container state
             wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, "css-1d6i0xy-Tabs-Tabs-Tabs-Tabs-Tabs-Tabs")))
     
-    return pd.DataFrame(data={"Track Name": tracks, "Track Links": tracks_links, "Race Time": race_times, "Race Number": race_numbers})
+    return pd.DataFrame(data={"Track Name": tracks, "Track Links": tracks_links, "Race Time": race_times, "Race Number": race_numbers, 'Day': days})
 
 def extract_market_prices(driver, track_name, race_number, other_race_data):
     """ Extract market prices Fixed(W) and Fixed(P) and calculates """
@@ -244,32 +254,36 @@ def find_race(driver: SafariWebDriver, race_data: pd.DataFrame) -> pd.DataFrame:
                 else:
                     raise
     
-    for button_selector in button_selectors:
-        # Checks for track name in today and tommorw races.
-        click_race_date(driver, button_selector)
-        time.sleep(10)
-        
-        anchors = get_anchors_with_retry(driver)
-        
-        for anchor_index in range(len(anchors)):
-            try:
-                title = anchors[anchor_index].get_attribute("title")
-                if title == track_name:
-                    driver.execute_script("arguments[0].click();", anchors[anchor_index])
-                    wait.until(EC.presence_of_element_located((By.CLASS_NAME, "css-1gtokez-RaceNav-RaceNav-RaceNav__CarouselItem-RaceNav-MeetingContainer-MeetingContainer__RaceNav-MeetingContainer")))
-                    
-                    slides = get_slides_with_retry(driver)
-                    slide = slides[int(race_number) - 1]
-                    anchors = slide.find_element(By.TAG_NAME, "a")
-                    driver.execute_script("arguments[0].click();", anchors)
-                    return extract_market_prices(driver, track_name, race_number, other_data)
-                else:
-                    continue
-            except StaleElementReferenceException:
-                # Re-fetch anchors and continue the loop
-                anchors = get_anchors_with_retry(driver)
-            continue
+    button_selector = button_selectors[0] if other_data["Day"] == "today" else button_selectors[1]
+    # for button_selector in button_selectors:
+    #     if other_data["Day"] == "tomorrow":
+    #         # Track name can be present in both days so important to know the day. 
+    #         continue
+            
+    # Checks for track name in today and tomorrow races.
+    click_race_date(driver, button_selector)
+    time.sleep(10)
     
+    anchors = get_anchors_with_retry(driver)
+    
+    for anchor_index in range(len(anchors)):
+        try:
+            title = anchors[anchor_index].get_attribute("title")
+            if title == track_name:
+                driver.execute_script("arguments[0].click();", anchors[anchor_index])
+                wait.until(EC.presence_of_element_located((By.CLASS_NAME, "css-1gtokez-RaceNav-RaceNav-RaceNav__CarouselItem-RaceNav-MeetingContainer-MeetingContainer__RaceNav-MeetingContainer")))
+                
+                slides = get_slides_with_retry(driver)
+                slide = slides[int(race_number) - 1]
+                anchors = slide.find_element(By.TAG_NAME, "a")
+                driver.execute_script("arguments[0].click();", anchors)
+                return extract_market_prices(driver, track_name, race_number, other_data)
+            else:
+                continue
+        except StaleElementReferenceException:
+            # Re-fetch anchors and continue the loop
+            anchors = get_anchors_with_retry(driver)
+            
     raise RaceNotFoundException
     
     
@@ -280,17 +294,17 @@ if __name__ == "__main__":
     3. Combines all races into df_races_data.csv
     4. Randomly selects a race from the csv file and returns a csv of market prices for participants in
     """
-    response = establish_connection("https://getsetbet.com.au/racing/")
-    response.implicitly_wait(60)
-    df = extract_tracks(response)
-    response.quit()
+    # response = establish_connection("https://getsetbet.com.au/racing/")
+    # response.implicitly_wait(60)
+    # df = extract_tracks(response)
+    # response.quit()
     
-    response = establish_connection("https://getsetbet.com.au/racing/")
-    response.implicitly_wait(60)
-    df1 = extract_tracks(response, True)
-    df2 = pd.concat([df, df1])
-    df2.to_csv("df_races_data.csv", index=False)
-    response.quit()
+    # response = establish_connection("https://getsetbet.com.au/racing/")
+    # response.implicitly_wait(60)
+    # df1 = extract_tracks(response, True)
+    # df2 = pd.concat([df, df1])
+    # df2.to_csv("df_races_data.csv", index=False)
+    # response.quit()
     
     response = establish_connection("https://getsetbet.com.au/racing/")
     response.implicitly_wait(60)
