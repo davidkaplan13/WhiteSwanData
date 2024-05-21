@@ -255,12 +255,6 @@ def find_race(driver: SafariWebDriver, race_data: pd.DataFrame) -> pd.DataFrame:
                     raise
     
     button_selector = button_selectors[0] if other_data["Day"] == "today" else button_selectors[1]
-    # for button_selector in button_selectors:
-    #     if other_data["Day"] == "tomorrow":
-    #         # Track name can be present in both days so important to know the day. 
-    #         continue
-            
-    # Checks for track name in today and tomorrow races.
     click_race_date(driver, button_selector)
     time.sleep(10)
     
@@ -294,17 +288,17 @@ if __name__ == "__main__":
     3. Combines all races into df_races_data.csv
     4. Randomly selects a race from the csv file and returns a csv of market prices for participants in
     """
-    # response = establish_connection("https://getsetbet.com.au/racing/")
-    # response.implicitly_wait(60)
-    # df = extract_tracks(response)
-    # response.quit()
+    response = establish_connection("https://getsetbet.com.au/racing/")
+    response.implicitly_wait(60)
+    df = extract_tracks(response)
+    response.quit()
     
-    # response = establish_connection("https://getsetbet.com.au/racing/")
-    # response.implicitly_wait(60)
-    # df1 = extract_tracks(response, True)
-    # df2 = pd.concat([df, df1])
-    # df2.to_csv("df_races_data.csv", index=False)
-    # response.quit()
+    response = establish_connection("https://getsetbet.com.au/racing/")
+    response.implicitly_wait(60)
+    df1 = extract_tracks(response, True)
+    df2 = pd.concat([df, df1])
+    df2.to_csv("df_races_data.csv", index=False)
+    response.quit()
     
     response = establish_connection("https://getsetbet.com.au/racing/")
     response.implicitly_wait(60)
