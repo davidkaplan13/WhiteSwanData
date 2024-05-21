@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "whiteswandata"
+version = "0.1.0"
+description = ""
+authors = ["davidkaplan13 <devik.kaplan@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pandas = "^2.2.2"
+selenium = "^4.21.0"
+requests = "^2.31.0"
+beautifulsoup4 = "^4.12.3"
+datetime = "^5.5"
+scrapy = "^2.11.2"
+scrapy-selenium = "^0.0.7"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
