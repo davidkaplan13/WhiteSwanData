@@ -1,4 +1,4 @@
-# WhiteSwanData Inteview
+# WhiteSwanData Interview
 
 ### Packages
 All packages are handled by poetry (Package manager). To run locally - run poetry install (--no-root).
